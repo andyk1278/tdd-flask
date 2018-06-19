@@ -4,7 +4,7 @@ from flask import Flask, request, session, g, redirect, url_for, \
 
 
 # configuration
-DATABASE = 'flaskr.db'
+DATABASE = 'tddflask.db'
 DEBUG = True
 SECRET_KEY = 'my_precious'
 USERNAME = 'admin'
@@ -29,11 +29,16 @@ def init_db():
             db.cursor().executescript(f.read())
         db.commit()
 
+# open db connection
+def get_db():
+    if not hasattr(g, 'sqlite_db'):
+        g.sqlite_db = connect_db()
+    return g.sqlite_db
 # close database connection
 @app.teardown_appcontext
 def close_db(error):
-    if hasattr(g, 'tddflask.db'):
-        g.sqite_db.close()
+    if hasattr(g, 'sqlite_db'):
+        g.sqlite_db.close()
 
 if __name__ == '__main__':
     init_db()
