@@ -1,7 +1,9 @@
-from app import app
-import os
-
 import unittest
+import os
+import tempfile
+
+from app import app
+
 
 class BasicTestCase(unittest.TestCase):
 
@@ -13,6 +15,72 @@ class BasicTestCase(unittest.TestCase):
     def test_database(self):
         tester = os.path.exists("tddflask.db")
         self.assertTrue(tester)
+
+
+class FlaskTestCase(unittest.TestCase):
+
+    def setUp(self):
+        """Set up a blank temporary db before each test."""
+        self.db_fd, app.app.config['DATABASE'] = tempfile.mkstemp()
+        app.app.config['TESTING'] = True
+        self.app = app.app.test_client()
+        app.init_db()
+
+    def tearDown(self):
+        """Destroy blank temp database after each test."""
+        os.close(self.db_fd)
+        os.unlink(app.app.config['DATABASE'])
+
+    def login(self, username, password):
+        """Login helper function."""
+        return self.app.post('/login', data=dict(
+            username=username,
+            password=password
+        ), follow_redirects=True)
+
+    def logout(self):
+        """Logout helper function."""
+        return self.app.get('/logout', follow_redirects=True)
+
+    # assert functions
+    def test_empty_db(self):
+        """Ensure db is blank"""
+        rv = self.app.get('/')
+        assert b'No entries here so far' in rv.data
+
+    def test_login_logout(self):
+        """Test login and logout using helper functions."""
+        rv = self.login(
+            app.app.config['USERNAME'],
+            app.app.config['PASSWORD'],
+        )
+        assert b'You were logged in ' in rv.data
+        rv = self.logout()
+        assert b'You were logged out' in rv.data
+        rv = self.login(
+            app.app.config['USERNAME'] + 'x',
+            app.app.config['PASSWORD']
+        )
+        assert b'Invaid username' in rv.data
+        rv = self.login(
+            app.app.config['USERNAME'],
+            app.app.config['PASSWORD'] + 'x'
+        )
+        assert b'Invalid password' in rv.data
+
+    def test_messages(self):
+        """Ensure that a user can post messages."""
+        self.login(
+            app.app.config['USERNAME'],
+            app.app.config['PASSWORD']
+        )
+        rv = self.app.post('/add', data=dict(
+            title='<Hello>',
+            text='<strong>HTML</strong> allowed here'
+        ), follow_redirects=True)
+        assert b'No entries here so far' not in rv.data
+        assert b'&lt;Hello&gt;' in rv.data
+        assert b'<strong>HTML</strong> allowed here' in rv.data
 
 
 if __name__=='__main__':
